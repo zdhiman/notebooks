@@ -1,0 +1,283 @@
+---
+title: "Poisson Regression"
+author: "Anubhav Dhiman"
+date: "3/6/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## What Are Poisson Regression Models?
+Poisson Regression models are best used for modeling events where the outcomes are counts
+
+## What is Poisson Distribution?
+It models the probability of event or events $y$ ocurring within a specific timeframe, assuming that $y$ occurences are not affected by the timing of previous ocurrences of $y$.
+
+```{r}
+colors<-c("Red", "Blue", "Gold", "Black", "Pink", "Green") #vector of colors
+poisson.dist<-list() #declare a list to hold distribution values
+a<-c(1, 2, 3, 4, 5, 6) # A vector for values of u
+
+for (i in 1:6) {
+  poisson.dist[[i]]<-c(dpois(0:20, i)) 
+  # Store distribution vector for each corresonding value of u
+}
+
+#plot each vector in the list using the colors vectors to represent each value for u
+ plot(unlist(poisson.dist[1]), type = "o", xlab="y", ylab = "P(y)", col=colors[i])
+
+for (i in 1:6) {
+ lines(unlist(poisson.dist[i]), type = "o", col=colors[i])
+  
+}
+ # Adds legend to the graph plotted
+legend("topright", legend=a, inset= 0.08,  cex = 1.0, fill = colors, title = "Values of u")
+```
+
+## How Does Poisson Distribution Differ From Normal Distribution?
+Poisson Distribution is most commonly used to find the probability of events occurring within a given time interval. Since we're talking about a count, with Poisson distribution, the result must be 0 or higher - it's not possible for an event to happen a negative number of times. On the other hand, Normal distribution is a continuous distribution for a continuous variable and it could result in a positive or negative value
+
+```{r}
+#create a sequence -3 to +3 with .05 increments 
+xseq<-seq(-3, 3, .05) 
+
+#generate a Probability Density Function
+densities<-dnorm(xseq, 0, 1) 
+
+#plot the graph
+plot(xseq, densities, col="blue", xlab="", ylab="Density", type="l", lwd=2) 
+# col: changes the color of line
+# xlab: and 'ylab' are labels for x and y axis respectively
+# type: defines the type of plot. 'l' gives a line graph
+# lwd: defines line width
+```
+
+### If there are 12 cars crossing a bridge per minute on average, what is the probability of having seventeen or more cars crossing the bridge in any given minute?
+
+```{r}
+# u = 12
+ppois(16, 12, lower.tail = FALSE)
+#lower.tail=logical; if TRUE (default) then probabilities are P[X<=x], otherwise, P[X > x].
+```
+
+## Poisson Regression Models and GLMs
+Generalized Linear Models are models in which response variables follow a distribution other than the normal distribution. That's in contrast to Linear regression models, in which response variables follow normal distribution.
+
+A Poisson Regression model is a Generalized Linear Model (GLM) that is used to model count data and contingency tables. The output $Y$ (count) is a value that follows the Poisson distribution. It assumes the logarithm of expected values (mean) that can be modeled into a linear form by some unknown parameters.
+
+To transform the non-linear relationship to linear form, a link function is used which is the log for Poisson Regression. For that reason, a Poisson Regression model is also called **log-linear model**.
+
+The coefficients are calculated using methods such as Maximum Likelihood Estimation(MLE) or maximum quasi-likelihood.
+
+One of the most important characteristics for Poisson distribution and Poisson Regression is *equidispersion*, which means that the mean and variance of the distribution are equal.
+
+Let us say that the mean ($\mu$) is denoted by $E(X)$. 
+$E(X)=\mu$
+
+For Poisson Regression, mean and variance are related as:
+$var(X)=\sigma^2E(X)$
+
+Where $\sigma^2$ is the dispersion parameter. Since $var(X)=E(X)$ (variance=mean) must hold for the Poisson model to be completely fit, $\sigma^2$ must be equal to $1$.
+
+When variance is greater than mean, that is called **over-dispersion** and it is greater than 1. If it is less than 1 than it is known as **under-dispersion**.
+
+## Poisson Regression Modeling Using Count Data
+
+We're going to model Poisson Regression related to how frequently yarn breaks during weaving.
+
+```{r}
+#install.packages("datasets")
+library(datasets) #include library datasets after installation
+
+data<-warpbreaks
+columns<-names(data) #Extract column names from dataframe
+columns #show columns
+
+ls.str(warpbreaks)
+
+hist(data$breaks) 
+#generate histogram of new.data$whrswk
+
+mean(data$breaks) #calculate mean
+
+var(data$breaks) #calculate variance
+```
+
+The variance is much greater than the mean, which suggests that we will have over-dispersion in the model.
+
+```{r}
+#model poisson regression usin glm()
+poisson.model<-glm(breaks~wool+tension, data, family = poisson(link = "log"))
+
+summary(poisson.model)
+```
+If the p is less than 0.05 then, the variable has an effect on the response variable. In the summary above, we can see that all p values are less than 0.05, hence, both explanatory variables (wool and tension) have significant effect on breaks.
+
+Before starting to interpret results, let's check whether the model has over-dispersion or under-dispersion. If the Residual Deviance is greater than the degrees of freedom, then over-dispersion exists. This means that the estimates are correct, but the standard errors (standard deviation) are wrong and unaccounted for by the model.
+
+The Null deviance shows how well the response variable is predicted by a model that includes only the intercept (grand mean) whereas residual with the inclusion of independent variables. Above, we can see that the addition of 3 (53-50 =3) independent variables decreased the deviance to 210.39 from 297.37. Greater difference in values means a bad fit.
+
+So, to have a more correct standard error we can use a quasi-poisson model:
+
+```{r}
+poisson.model2<-glm(breaks~wool+tension, data = data, family = quasipoisson(link = "log"))
+
+summary(poisson.model)
+```
+
+### Comparing The Models
+
+```{r}
+#install.packages("arm")
+# load library arm that contains the function se.coef()
+library(arm) 
+
+#extract co-effcients from first model using 'coef()'
+coef1=coef(poisson.model) 
+
+#extract co-effcients from second model
+coef2=coef(poisson.model2) 
+
+#extract standard errors from first model using 'se.coef()'
+se.coef1=se.coef(poisson.model) 
+
+#extract standard errors from second model
+se.coef2=se.coef(poisson.model2)
+
+#use 'cbind()' to combine values one dataframe
+models.both<-cbind(coef1, se.coef1, coef2, se.coef2, exponent=exp(coef1)) 
+
+# show dataframe
+models.both 
+```
+
+In above output, we can see the coefficients are the same, but the standard errors are different.
+
+Keeping these points in mind, let's see estimate for *wool*.
+```{r}
+coeff_wool = exp(-0.2059884)
+1-coeff_wool
+```
+If we change wool type from A to B, the number of breaks will fall by 18.6% assuming all other variables are the same.
+
+### Predicting From The Model
+```{r}
+#make a datframe with new data
+newdata = data.frame(wool="B", tension="M")
+
+#use 'predict() to run model on new data
+predict(poisson.model2, newdata = newdata, type = "response")
+```
+
+Our model is predicting there will be roughly 24 breaks with wool type B and tension level M.
+
+## Visualizing Findings
+
+```{r}
+#Install the package jtools if not already installed
+#install.packages("jtools")
+
+#you may be asked to install 'broom' and 'ggstance' packages as well
+#install.packages("broom")
+#install.packages("ggstance")
+
+#Include jtools library
+library(jtools)
+
+#plot regression coefficients for poisson.model2
+plot_summs(poisson.model2, scale = TRUE, exp = TRUE)
+```
+
+```{r}
+#plot regression coefficients for poisson.model2 and poisson.model
+plot_summs(poisson.model, poisson.model2, scale = TRUE, exp = TRUE)
+```
+
+```{r}
+# install.packages("interactions")
+cat_plot(poisson.model2, pred = wool, modx = tension)
+#argument 1=regression model
+#pred=The categorical variable that will appear on x-axis
+#modx=A categorical moderator variable. Moderator variable that has an effect in combination to pred on outcome
+```
+
+```{r}
+# using cat_plot. Pass poisson.model2 and we want to see effect of tension type so we set pred=tension
+cat_plot(poisson.model2, pred = tension, modx=wool)
+```
+
+```{r}
+cat_plot(poisson.model2, pred = tension, modx = wool, geom = "line")
+```
+
+```{r}
+cat_plot(poisson.model2, pred = tension, modx = wool, geom = "line", plot.points = TRUE)
+```
+
+## Poisson Regression Modeling Using Rate Data
+So far we have modeled count data, but we can also model rate data that is predicting the number of counts over a period of time or grouping. 
+
+```{r}
+#install.packages("ISwR")
+library(ISwR)
+
+data(eba1977)
+cancer.data = eba1977
+cancer.data[1:10,]
+#Description
+#Lung cancer incidence in four Danish cities 1968-1971
+
+#Description:
+#     This data set contains counts of incident lung cancer cases and
+#     population size in four neighbouring Danish cities by age group.
+
+#Format:
+#     A data frame with 24 observations on the following 4 variables:
+#     city a factor with levels Fredericia, Horsens, Kolding, and Vejle.
+#     age a factor with levels 40-54, 55-59, 60-64, 65-69,70-74, and 75+.
+#     pop a numeric vector, number of inhabitants.
+#    cases a numeric vector, number of lung cancer cases.
+```
+
+```{r}
+#find the log(n) of each value in 'pop' column. It is the third column
+logpop = log(cancer.data[,3])
+
+#add the log values to the dataframe using 'cbind()'
+new.cancer.data = cbind(cancer.data, logpop)
+
+#display new dataframe
+new.cancer.data
+```
+```{r}
+poisson.model.rate <- glm(cases ~ city + age+ offset(logpop), family = poisson(link = "log"), data = cancer.data)
+
+#display summary
+summary(poisson.model.rate)
+```
+
+In this dataset, we can see that the residual deviance is near to degrees of freedom, and the dispersion parameter is 1.5 (23.447/15) which is small, so the model is a good fit.
+
+```{r}
+fitted(poisson.model.rate)
+```
+
+```{r}
+#create a test dataframe containing new values of variables
+test.data=data.frame(city = "Kolding", age = "40-54", pop = 1000, logpop = log(1000)) 
+
+#predict outcomes (responses) using 'predict()' 
+predicted.value<-predict(poisson.model.rate, test.data, type = "response") 
+
+#show predicted value
+predicted.value
+```
+
+So, for the city of Kolding among people in the age group 40-54, we could expect roughly 2 or 3 cases of lung cancer per 1000 people.
+
+As with the count data, we could also use quasi-poisson to get more correct standard errors with rate data.
+
+
+
